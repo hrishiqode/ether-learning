@@ -109,7 +109,7 @@ contract Assets is IERC721{
 
     string private symbol;
 
-    address payable coinsContract=0x7b96aF9Bd211cBf6BA5b0dd53aa61Dc5806b6AcE;
+    address coinsContract=0x7b96aF9Bd211cBf6BA5b0dd53aa61Dc5806b6AcE;
 
     mapping(uint256 => address) private owners;
 
