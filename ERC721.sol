@@ -1,5 +1,112 @@
 pragma solidity >=0.8.2 <0.9.0;
 
+pragma solidity >=0.8.2 <0.9.0;
+
+interface IERC20 {
+  function totalSupply() external view returns (uint256);
+
+  function balanceOf(address who) external view returns (uint256);
+
+  function allowance(address owner, address spender) external view returns (uint256);
+
+  function transfer(address to, uint256 value) external returns (bool);
+
+  function approve(address spender, uint256 value) external returns (bool);
+
+  function transferFrom(address from, address to, uint256 value) external returns (bool);
+
+  event Transfer(
+    address indexed from,
+    address indexed to,
+    uint256 value
+  );
+
+  event Approval(
+    address indexed owner,
+    address indexed spender,
+    uint256 value
+  );
+}
+contract Coins is IERC20{
+    mapping (address => uint256) private balance;
+
+    address private owner;
+
+    constructor(){
+        balance[msg.sender]=1000;
+        owner=msg.sender;
+    }
+
+    uint256 private totalTokens;
+
+    mapping (address => mapping (address => uint256)) private maximumAllowance;
+
+    mapping (address => mapping (address => uint128)) private totalCalls;
+
+    function totalSupply() public view returns(uint256){
+        return totalTokens;
+    }
+
+    function balanceOf(address _owner) public view returns(uint256){
+        return balance[_owner];
+    }
+
+    function transfer(address _to, uint256 _value) public returns (bool success){
+        if(balance[msg.sender] <= _value)
+        {
+            return false;
+        }
+        balance[msg.sender]=balance[msg.sender]-_value;
+        balance[_to]=balance[_to]+_value;
+        emit Transfer(msg.sender,_to,_value);
+        return true;
+    }
+
+    function mint(address _to) public {
+        require(msg.sender==owner, "Not Authorized to mint coins");
+        balance[_to]=balance[_to]+10;
+        totalTokens+=10;
+    }
+
+    function transferFrom(address _from, address _to, uint256 _value) external returns (bool){
+        emit Transfer(_from,_to,_value);
+        if(balance[_from] >= _value && _value <= maximumAllowance[msg.sender][_from])
+        {
+            return false;
+        }
+        maximumAllowance[_from][_to]=maximumAllowance[_from][_to]-_value;
+        balance[_from]=balance[_from]-_value;
+        balance[_to]=balance[_to]+_value;
+        emit Transfer(_from,_to,_value);
+        return true;
+    }
+
+    function approve(address _spender, uint256 _value) external returns (bool){
+        maximumAllowance[msg.sender][_spender]=_value;
+        emit Approval(msg.sender,_spender,_value);
+        return true;
+    }
+
+    function allowance(address _owner, address _spender) external view returns (uint256){
+        return maximumAllowance[_owner][_spender];
+    }
+
+    function forNFTSwap(bytes memory from, bytes memory to, uint256 _value) external returns (bool){
+        address _from=abi.decode(from,(address));
+        address _to=abi.decode(to,(address));
+        transfer(_to,_value);
+        emit Transfer(_from,_to,_value);
+        return true;
+    }
+
+    function forNFTSwap1(bytes memory from, bytes memory to, uint256 _value) external returns (bool){
+        /* address _from=abi.decode(from,(address));
+        address _to=abi.decode(to,(address));
+        transfer(_to,_value);
+        emit Transfer(_from,_to,_value); */
+        return true;
+    }
+}
 interface IERC721 /* is ERC165 */ {
     /// @dev This emits when ownership of any NFT changes by any mechanism.
     ///  This event emits when NFTs are created (`from` == 0) and destroyed
@@ -107,11 +214,17 @@ interface IERC165 {
 contract Assets is IERC721{
     string private name;
 
+    uint256 public totalTokens;
+
     string private symbol;
 
-    address coinsContract=0x7b96aF9Bd211cBf6BA5b0dd53aa61Dc5806b6AcE;
+    address creator;
+
+    address private coinsContract;
 
     mapping(uint256 => address) private owners;
+
+    mapping(uint256 => uint256) private prices;
 
     mapping(address => uint256) private balances;
 
@@ -119,8 +232,9 @@ contract Assets is IERC721{
 
     mapping(address => mapping(address => bool)) private operatorApprovals;
 
-    constructor(string memory _symbol) {
-        symbol = symbol;
+    constructor(address _coinsContract) {
+        coinsContract=_coinsContract;
+        creator=msg.sender;
     }
 
     function balanceOf(address owner) public view returns (uint256) {
@@ -131,7 +245,7 @@ contract Assets is IERC721{
         return owners[tokenId];
     }
 
-    function approve(address to, uint256 tokenId) public payable {
+    function approve(address to, uint256 tokenId) public {
         address owner = owners[tokenId];
         require(
             msg.sender == owner || isApprovedForAll(owner, msg.sender),
@@ -141,20 +255,20 @@ contract Assets is IERC721{
         emit Approval(owners[tokenId], to, tokenId);
     }
 
-    function getApproved(uint256 tokenId) public view virtual override returns (address) {
+    function getApproved(uint256 tokenId) public view  override returns (address) {
         return tokenApprovals[tokenId];
     }
 
-    function setApprovalForAll(address operator, bool approved) public virtual override {
+    function setApprovalForAll(address operator, bool approved) public  override {
         operatorApprovals[msg.sender][operator] = approved;
         emit ApprovalForAll(msg.sender, operator, approved);
     }
 
-    function isApprovedForAll(address owner, address operator) public view virtual override returns (bool) {
+    function isApprovedForAll(address owner, address operator) public view override returns (bool) {
         return operatorApprovals[owner][operator];
     }
 
-    function transferFrom(address from, address to, uint256 tokenId) public  payable {
+    function transferFrom(address from, address to, uint256 tokenId) public  {
         address owner = owners[tokenId];
         require(from == owner && (owner ==msg.sender || isApprovedForAll(owner, msg.sender) || getApproved(tokenId) == to), "Not Authorized");
         delete tokenApprovals[tokenId];
@@ -164,7 +278,7 @@ contract Assets is IERC721{
         emit Transfer(from, to, tokenId);
     }
 
-    function safeTransferFrom(address from, address to, uint256 tokenId) public payable {
+    function safeTransferFrom(address from, address to, uint256 tokenId) public {
         transferFrom(from, to, tokenId);
     }
 
@@ -172,12 +286,19 @@ contract Assets is IERC721{
         transferFrom(from, to, tokenId);
     }
 
-    function mint() public {
-        //to implement
+    function mint(uint256 price) public {
+        totalTokens++;
+        owners[totalTokens]=msg.sender;
+        balances[msg.sender]++;
+        prices[totalTokens]=price;
     }
 
-    function swap(address from,address to,uint256 tokenId) public payable returns(bool)
+    function swap(address from,address to,uint256 tokenId) external returns(bool)
     {
-        //toImplement
+        address payable _coinsContract=payable(coinsContract);
+        (bool success,bytes memory data)=_coinsContract.delegatecall((abi.encodeWithSignature("forNFTSwap(bytes,bytes,uint256)",abi.encode(to), abi.encode(from), prices[tokenId])));
+        require(success,"Payment not recieved");
+        transferFrom(from, to, tokenId);
+        return true;
     }
 }
